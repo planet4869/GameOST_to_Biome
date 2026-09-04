@@ -1,0 +1,397 @@
+---
+title: Can You Hear the Biome? Game Music-to-Scene Classification
+theme: device
+favicon: favicon.svg
+description: Can you tell what environment (biome) a game soundtrack was written for, just by listening? We check with an MERT-based classifier and a human blind test.
+date: 2026-09-04
+thumbnail: screenshot-light.png
+---
+
+import Header from "../../components/Header.astro";
+import HighlightedSection from "../../components/HighlightedSection.astro";
+import SmallCaps from "../../components/SmallCaps.astro";
+import Figure from "../../components/Figure.astro";
+import Wide from "../../components/Wide.astro";
+import Carousel from "../../components/Carousel.astro";
+import CarouselSlide from "../../components/CarouselSlide.astro";
+
+{/*
+  [※ 확인 필요] 저자 이름 로마자 표기 확정 필요 — "이동규"는 기존 GitHub handle(dg-lee23)
+  기준 Donggyu Lee로 넣었고, "구교영"은 확실한 근거가 없어 Gyoyoung Koo로 임시 표기했습니다.
+  소속·링크도 실제 정보로 교체하세요.
+  conference prop은 학회 제출용이 아니라서 뺐습니다.
+  background cover는 아직 없어서 비워뒀습니다.
+*/}
+<Header
+  title="Can You Hear the Biome? Game Music-to-Scene Classification"
+  authors={[
+    { name: "Gyoyoung Koo", url: "[※ 링크 또는 삭제]" },
+    { name: "Donggyu Lee", url: "https://dg-lee23.github.io/blog/" },
+  ]}
+  links={[
+    { name: "Code", url: "[※ 실제 GitHub repo 링크로 교체]", icon: "ri:github-line" },
+  ]}
+>
+  {/* <Picture slot="background" src={coverImage} alt="" priority /> */}
+</Header>
+
+<HighlightedSection>
+
+## Abstract
+
+Game soundtracks often strongly evoke the environment of a scene — forest, desert, cave, and so on. We wanted to find out whether that impression is just a personal association from playing the game, or whether the music itself carries a real signal that distinguishes one environment from another. We built an MERT-based classifier that sorts modern-era game music into six biome classes (forest, desert, snow_ice, jungle, cave_underground, ocean_water), and compared it against a cue-only baseline built from named acoustic descriptors, and a blind test with four human listeners. Evaluated under matched conditions (the same 50 tracks), the model's macro-F1 (0.395) was statistically indistinguishable from human performance (0.381), and both were clearly above chance (0.167) and the cue-only baseline (0.24). This suggests biome recognition isn't purely a product of personal experience — it's grounded, at least partially and probabilistically, in a real signal present in the music itself.
+
+</HighlightedSection>
+
+## Introduction
+
+My favorite childhood game was MapleStory. Some soundtracks still remind me of certain spots. For instance, *Happy Village* is a snow-quiet town under a fat Christmas moon — see how well it fits:
+
+<Figure>
+  <div slot="figure" class="flex flex-col items-center gap-3">
+    <img src="/images/happy-village.png" alt="Happy Village, a snow-covered Christmas town from MapleStory" class="rounded-lg max-w-sm w-full" />
+    <audio controls src="/audio/happy-village.mp3" class="w-full max-w-sm" />
+  </div>
+  <span slot="caption">Happy Village, MapleStory</span>
+</Figure>
+
+But is that fit simply nostalgia, or does the music somehow encode the characteristics of the place? In other words,
+
+> *Would a first-time listener also picture a similar scene?*
+
+A handful of recent projects map music to visual properties directly — Music2Palette [@music2palette2025] derives color palettes through a shared emotion space, while Music2P [@music2p2024] generates images for album cover design conditioned on audio. But these all produce continuous, generative output. We wanted a narrower, more falsifiable question: for game music specifically, can a listener — human or machine — tell which of a small set of discrete environments a track was written for? In this post, we make the "scene" question easier to answer by replacing it with **biome**.
+
+## Examples
+
+Before diving in, let's listen to the six biomes we're trying to distinguish. Listen to the audio first, guess the biome yourself, then expand to check the answer — photo and name.
+
+<Carousel>
+  <CarouselSlide>
+    <div class="flex flex-col items-center gap-3">
+      <audio controls src="/audio/ellinia.mp3" class="w-full max-w-sm" />
+      <details class="w-full max-w-sm">
+        <summary class="cursor-pointer text-center text-sm text-muted-foreground select-none [&::marker]:text-orange-600 dark:[&::marker]:text-orange-400 [&::-webkit-details-marker]:text-orange-600 dark:[&::-webkit-details-marker]:text-orange-400">
+          Listen first, guess the biome, then click to reveal
+        </summary>
+        <div class="mt-3 flex flex-col items-center gap-2">
+          <img src="/images/ellinia.png" alt="Ellinia, a Forest biome example" class="rounded-lg max-w-sm w-full" />
+          <span class="text-sm">Forest — Ellinia, MapleStory</span>
+        </div>
+      </details>
+    </div>
+  </CarouselSlide>
+  <CarouselSlide>
+    <div class="flex flex-col items-center gap-3">
+      <audio controls src="/audio/ariant.mp3" class="w-full max-w-sm" />
+      <details class="w-full max-w-sm">
+        <summary class="cursor-pointer text-center text-sm text-muted-foreground select-none [&::marker]:text-orange-600 dark:[&::marker]:text-orange-400 [&::-webkit-details-marker]:text-orange-600 dark:[&::-webkit-details-marker]:text-orange-400">
+          Listen first, guess the biome, then click to reveal
+        </summary>
+        <div class="mt-3 flex flex-col items-center gap-2">
+          <img src="/images/ariant.png" alt="Ariant, a Desert biome example" class="rounded-lg max-w-sm w-full" />
+          <span class="text-sm">Desert — Ariant, MapleStory</span>
+        </div>
+      </details>
+    </div>
+  </CarouselSlide>
+  <CarouselSlide>
+    <div class="flex flex-col items-center gap-3">
+      <audio controls src="/audio/elnath.mp3" class="w-full max-w-sm" />
+      <details class="w-full max-w-sm">
+        <summary class="cursor-pointer text-center text-sm text-muted-foreground select-none [&::marker]:text-orange-600 dark:[&::marker]:text-orange-400 [&::-webkit-details-marker]:text-orange-600 dark:[&::-webkit-details-marker]:text-orange-400">
+          Listen first, guess the biome, then click to reveal
+        </summary>
+        <div class="mt-3 flex flex-col items-center gap-2">
+          <img src="/images/elnath.png" alt="Elnath, a Snow biome example" class="rounded-lg max-w-sm w-full" />
+          <span class="text-sm">Snow — Elnath, MapleStory</span>
+        </div>
+      </details>
+    </div>
+  </CarouselSlide>
+  <CarouselSlide>
+    <div class="flex flex-col items-center gap-3">
+      <audio controls src="/audio/partem.mp3" class="w-full max-w-sm" />
+      <details class="w-full max-w-sm">
+        <summary class="cursor-pointer text-center text-sm text-muted-foreground select-none [&::marker]:text-orange-600 dark:[&::marker]:text-orange-400 [&::-webkit-details-marker]:text-orange-600 dark:[&::-webkit-details-marker]:text-orange-400">
+          Listen first, guess the biome, then click to reveal
+        </summary>
+        <div class="mt-3 flex flex-col items-center gap-2">
+          <img src="/images/partem.png" alt="Partem, a Jungle biome example" class="rounded-lg max-w-sm w-full" />
+          <span class="text-sm">Jungle — Partem, MapleStory</span>
+        </div>
+      </details>
+    </div>
+  </CarouselSlide>
+  <CarouselSlide>
+    <div class="flex flex-col items-center gap-3">
+      <audio controls src="/audio/mine.mp3" class="w-full max-w-sm" />
+      <details class="w-full max-w-sm">
+        <summary class="cursor-pointer text-center text-sm text-muted-foreground select-none [&::marker]:text-orange-600 dark:[&::marker]:text-orange-400 [&::-webkit-details-marker]:text-orange-600 dark:[&::-webkit-details-marker]:text-orange-400">
+          Listen first, guess the biome, then click to reveal
+        </summary>
+        <div class="mt-3 flex flex-col items-center gap-2">
+          <img src="/images/mine.png" alt="Mine, a Cave biome example" class="rounded-lg max-w-sm w-full" />
+          <span class="text-sm">Cave — Mine, MapleStory</span>
+        </div>
+      </details>
+    </div>
+  </CarouselSlide>
+  <CarouselSlide>
+    <div class="flex flex-col items-center gap-3">
+      <audio controls src="/audio/sellas.mp3" class="w-full max-w-sm" />
+      <details class="w-full max-w-sm">
+        <summary class="cursor-pointer text-center text-sm text-muted-foreground select-none [&::marker]:text-orange-600 dark:[&::marker]:text-orange-400 [&::-webkit-details-marker]:text-orange-600 dark:[&::-webkit-details-marker]:text-orange-400">
+          Listen first, guess the biome, then click to reveal
+        </summary>
+        <div class="mt-3 flex flex-col items-center gap-2">
+          <img src="/images/sellas.png" alt="Sellas, an Ocean biome example" class="rounded-lg max-w-sm w-full" />
+          <span class="text-sm">Ocean — Sellas, MapleStory</span>
+        </div>
+      </details>
+    </div>
+  </CarouselSlide>
+</Carousel>
+
+---
+
+# Method
+
+Can you tell what biome a game soundtrack was written for, just by listening? The pipeline that answers this question didn't come together in one pass. Honestly, something was broken at almost every step. But fixing each one made it clearer what this project was actually measuring.
+
+## Architecture
+
+<Figure>
+  <div slot="figure" class="w-full! flex justify-center">
+    <div style="text-align: center; margin: 24px 0;">
+    <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg" width="800" height="200" style="width: 100% !important; max-width: 100% !important; height: auto !important; display: block !important; font-family: inherit;">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+
+      <g>
+        <rect x="10" y="70" width="90" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+        <path d="M20 100 L30 85 L40 115 L50 90 L60 110 L70 95 L80 105 L90 100" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+        <text x="55" y="150" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.7">15s segment</text>
+      </g>
+
+      <line x1="100" y1="100" x2="150" y2="100" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+
+      <g>
+        <rect x="150" y="55" width="150" height="90" rx="8" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text x="225" y="95" text-anchor="middle" font-size="15" font-weight="bold" fill="currentColor">MERT</text>
+        <text x="225" y="115" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.6">(frozen)</text>
+        <text x="225" y="160" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">n_layers=25, t_patches=1125</text>
+        <text x="225" y="173" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">dim=1024</text>
+      </g>
+
+      <line x1="300" y1="100" x2="350" y2="100" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+
+      <g>
+        <rect x="350" y="70" width="100" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.85"/>
+        <text x="400" y="105" text-anchor="middle" font-size="12" fill="currentColor">layer select</text>
+        <text x="400" y="150" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.7">dim=1024</text>
+      </g>
+
+      <line x1="450" y1="100" x2="500" y2="100" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+
+      <g>
+        <rect x="500" y="55" width="130" height="90" rx="8" fill="none" stroke="currentColor" stroke-width="2"/>
+        <text x="565" y="90" text-anchor="middle" font-size="15" font-weight="bold" fill="currentColor">MLP</text>
+        <text x="565" y="118" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.6">(trained)</text>
+        <text x="565" y="165" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.7"> 1024 → 64 → 6 </text>
+      </g>
+
+      <line x1="630" y1="100" x2="675" y2="100" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)" opacity="0.7"/>
+
+      <g transform="translate(685, 60)">
+        <rect x="0" y="1" width="16" height="79" fill="currentColor" opacity="0.15"/>
+        <rect x="20" y="21" width="16" height="59" fill="currentColor" opacity="0.15"/>
+        <rect x="40" y="46" width="16" height="34" fill="currentColor" opacity="0.15"/>
+        <rect x="60" y="66" width="16" height="14" fill="currentColor" opacity="0.15"/>
+        <rect x="0" y="1" width="16" height="79" fill="none"/>
+        <rect x="0" y="1" width="16" height="79" fill="#c0392b"/>
+        <line x1="-6" y1="80" x2="80" y2="80" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+      </g>
+      <text x="720" y="163" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">prediction</text>
+
+    </svg>
+    </div>
+  </div>
+</Figure>
+
+We train a small MLP head on top of MERT [@mert2024]. Instead of averaging all 25 hidden layers uniformly, we evaluate each layer individually with a linear probe under GroupKFold cross-validation (a layer sweep), and select the single best-performing layer by macro-F1 — its feature then passes through an MLP (1024 → 64 → 6) to produce a 6-class probability distribution.
+
+## Obstacles
+
+### 1. How Many Biomes, and How to Split Them
+
+Defining the biome taxonomy wasn't just a labeling rule — it was a choice that determined how hard this task is, in principle. We used two criteria.
+
+- **(1) The environment must be clearly distinguishable by ear.** For this task to make sense at all, there needs to be at least some signal a human can pick up on. Candidates like mechanical city, hell, and space got cut early in discussion under this criterion — no matter how hard we listened, they didn't sound clearly distinct from each other or from the existing classes.
+- **(2) Keep a class separate if the in-game setting is clearly distinct, even when the music overlaps.** The question this project asks is "can the game's setting be inferred from the music alone?" — so musical confusion is treated as task difficulty, not a flaw in the taxonomy.
+
+Criterion (1) wasn't arbitrary — this was independently confirmed by a separate blind test (§4). For participants too, bell-like sounds were essentially the only cue distinguishing forest from snow, and the two collapsed into something close to a single class.
+
+Jungle and desert are an example of criterion (2) — the two classes share some instrumentation and genre conventions, so listeners confused a few tracks (§4), but most tracks were clearly distinguishable, and the in-game settings themselves are obviously different environments, so we kept them separate.
+
+Keeping all six classes (forest, snow_ice, desert, jungle, cave_underground, ocean_water) reflects a balance between these two criteria and the amount of data each class could support (even the smallest, cave_underground, has 39 tracks after modern-only filtering; §3).
+
+### 2. The First Data Leak, From Splitting Segments
+
+We didn't have enough full tracks to use as training samples, so we cut each track into 15-second segments and treated each one as an individual sample. When we ran early experiments this way, accuracy came back suspiciously high. It turned out segments from the same track were being scattered randomly across train, validation, and test — the model wasn't generalizing to new tracks, it was closer to recognizing a track it had already partly heard.
+
+To fix this, we introduced a **track-disjoint split**: every segment from a given track is forced into exactly one of train, validation, or test, split at the group level (`GroupShuffleSplit` / `GroupKFold`, group = the source track). Accuracy dropped sharply after this fix — but that lower number is the real generalization performance.
+
+The table below compares a single point where both problems were absent against the current, fixed state.
+
+| | segment-level macro-F1 |
+|---|---|
+| Before fix (random segment split, no track aggregation) | 0.8815 |
+| After fix (track-disjoint split, before track aggregation) | 0.434 |
+
+When segments from the same track were mixed across train and test, the model was effectively solving a "recognize a track you've already heard" problem.
+
+### 3. Aggregating Segment Predictions Back to Tracks
+
+Both evaluation and real use require a single answer per track, so we needed to recombine multiple segment predictions back into one. We compared majority vote (a plurality vote across each segment's final predicted class) against averaging the per-segment probability distributions before taking the argmax, and adopted the latter. Averaging probabilities preserves each segment's confidence, so it loses less information than a plain vote.
+
+| Aggregation method | track-level macro-F1 (n=368 tracks) |
+|---|---|
+| Majority vote | 0.4903 |
+| Probability averaging (adopted) | 0.5055 |
+
+### 4. The Era-Mixing Problem
+
+While auditing the data, we found the game music we'd collected spanned wildly different production eras. Older hardware (8-bit/16-bit consoles, say) has a bandwidth-limited, synthesized sound that's clearly different from modern music, and we suspected this difference could confuse the model in ways unrelated to biome. To test this, we tagged tracks into three tiers — `modern`, `chiptune`, `sampled_lofi` — restricted the data to `modern` only, and retrained the whole pipeline.
+
+| | macro-F1 |
+|---|---|
+| Before fix (all eras mixed, n=368 tracks) | 0.5055 |
+| After fix (modern tier only, n=138 tracks) | 0.4726 |
+
+The result cleanly betrayed our hypothesis — macro-F1 actually dropped slightly (−0.033). Two opposing effects may have been at play at once.
+
+- Removing era mixing may have cleaned up the signal
+- Restricting to the modern tier sharply cut the number of trainable tracks (the dev pool shrank to roughly a third)
+
+That said, this comparison's test set is only 138 tracks (10–39 per class), small enough that whether this difference is statistically meaningful needs separate verification. We adopt the modern-tier results as the headline numbers going forward, but withhold judgment on the net effect of this filtering.
+
+### 5. Establishing a Human Ceiling — the Blind Test
+
+We ran into a problem: there was no benchmark for whether the model's macro-F1 was actually "good enough." To fix this, we designed a human blind test on 50 tracks, sampled in class-balanced fashion across the six classes from the modern tier. Four participants listened to each track (with no label information) and guessed the biome. Before guessing, they wrote down in free text what acoustic features they'd heard — which blocks the bias of reverse-engineering cues to fit the answer after the fact.
+
+### 6. Cue-only Baseline
+
+This leaves one nagging question: is the model really listening to "atmosphere," or is it just cheating? Desert tracks, for instance, tend to share a similar key, rhythm, and instrumentation. Picking up on these named acoustic cues alone might be enough to guess the biome reasonably well.
+
+So we checked. We fed the same MLP head roughly 600 standard audio descriptors extracted with librosa (filtered down to the statistically significant ones), instead of MERT embeddings.
+
+| | macro-F1 |
+|---|---|
+| Cue-only classifier | 0.24 |
+| MERT-based model | 0.4726 |
+
+It fell well short of both the human baseline and the full model. This isn't proof the model deeply understands "atmosphere" — but at least it's not the cheap trick.
+
+---
+
+# Results
+
+## The Four-Anchor Comparison
+
+To gauge how hard this task really is, we set four benchmark points. macro-F1 is the unweighted average of the per-class F1 scores:
+
+$$
+\text{macro-F1} = \frac{1}{6}\sum_{c=1}^{6} F1_c
+$$
+
+| Benchmark | macro-F1 |
+|---|---|
+| Chance (uniform over 6 classes) | 0.167 |
+| Cue-only classifier | 0.24 |
+| Human (n=4, 50 tracks) | 0.381 |
+| MERT-based model (matched 50 tracks) | 0.395 |
+
+{/* [※ FIGURE: 4-anchor bar chart 삽입] */}
+
+Humans are clearly above chance, and the MERT-based model edges out humans by a small margin. We test separately below whether that difference is statistically meaningful.
+
+## Human vs. Machine: Matched Comparison
+
+Comparing the model's headline performance (modern-tier overall holdout macro-F1 = 0.4726, n=138 tracks) directly against the human blind test results isn't methodologically sound — the two evaluations covered different sets of tracks. To fix this, we rebuilt the holdout split so the 50 blind-test tracks were entirely excluded from training data (track-disjoint, with these 50 forced into the test set), retrained the model, and recomputed macro-F1 using only predictions on those exact 50 tracks (matched macro-F1 = 0.395).
+
+**Before / after — the single fix that flipped this project's conclusion**
+
+| | Machine macro-F1 | Human macro-F1 | Conclusion |
+|---|---|---|---|
+| Before fix (unmatched comparison) | 0.4726 | 0.381 | Machine wins |
+| After fix (same 50 tracks, leak removed) | 0.395 | 0.381 | No statistical difference |
+
+Fixing one procedural mismatch flipped the conclusion entirely. This shows that the initial impression — "the machine beats humans" — was actually an illusion created by a mismatched evaluation set.
+
+A track-level cluster bootstrap (2,000 resamples) testing the human-machine gap on these matched 50 tracks found a 95% confidence interval of [-0.114, 0.145] for the difference (Machine − Human, +0.014) — which includes zero, so the two performances aren't statistically distinguishable.
+
+## Per-Class Asymmetry: Similar Averages, Different Strengths
+
+Breaking down the matched-50 confusion matrix class by class, humans and the model fail in different places despite having similar overall macro-F1.
+
+| Class | Human recall | Machine recall |
+|---|---|---|
+| cave_underground | 33% | **0%** |
+| desert | 53% | 44% |
+| forest | 25% | 38% |
+| jungle | 59% | 62% |
+| ocean_water | 31% | **62%** |
+| snow_ice | 28% | 50% |
+
+<div class="flex flex-col sm:flex-row gap-4 justify-center">
+  <img src="/images/cm_human_recomputed.png" alt="Human blind test confusion matrix" class="rounded-lg max-w-md w-full" />
+  <img src="/images/cm_matched_50.png" alt="Model's matched-50 confusion matrix" class="rounded-lg max-w-md w-full" />
+</div>
+
+The starkest gap is in cave_underground and ocean_water.
+
+- **cave_underground**: human 33% vs. machine 0% — the model didn't get a single one of the matched 50 tracks right.
+- **ocean_water**: machine 62% vs. human 31% — for humans, this was the class most often confused with forest and snow_ice.
+
+- **jungle — the one point of agreement**: both humans (59%) and the model (62%, tied for first with ocean) did best on this class out of all six.
+- **forest — a class only humans struggle with**: human 25% (lowest of all six, even below cave) vs. machine 38% (not a particularly weak class for it). Where cave and ocean showed "each is strong where the other isn't," forest is a different kind of asymmetry.
+
+cave_underground's poor performance (0% recall) is likely tangled up with data scarcity rather than a fundamental model limitation — it was already the smallest class in the modern tier (39 tracks), and once 9 of the blind-test 50 were pulled into the holdout, only 20 tracks were left to train on. That's a much bigger loss than desert saw (only 9 of 131 excluded).
+
+---
+
+# Discussion
+
+If biome association in game music were purely a byproduct of having played a particular title or genre, a model with no exposure to games or gaming culture should perform at chance. Instead, MERT — pretrained exclusively on generic music, with no information about games at all — reached a macro-F1 of 0.4726, clearly above the 0.167 chance baseline, and when evaluated on the same set of tracks as the human blind test, was statistically indistinguishable from human performance (0.395 vs. 0.381; 95% CI for the difference: [-0.114, 0.145]). This suggests composers really do encode biome-relevant regularities — instrumentation, rhythmic density, harmonic language — into the music itself, and that these are partially recoverable from audio alone, without any contextual or experiential grounding.
+
+At the same time, this signal is neither complete nor fully interpretable — a classifier built solely from named acoustic descriptors performed markedly worse than MERT (0.24 vs. 0.4726), and certain class pairs, like jungle and desert, remain genuinely ambiguous even to human listeners. The evidence therefore supports a middle position: biome recognition in music reflects a real, partial, and probabilistic acoustic signal — neither an arbitrary cultural projection, nor a fully deterministic mapping.
+
+One class-level asymmetry is worth recording as a hypothesis, not a settled conclusion: in the matched evaluation, the model most often confused cave_underground with desert, while human listeners rarely made this particular mistake. This raises the possibility that MERT's embedding space places cave and desert closer together than human perceptual space does — perhaps due to some shared low-frequency, resonant acoustic quality between the two categories — but this hasn't been directly tested and remains speculative.
+
+**Limitations.** The bootstrap confidence interval is wide at n=50 (roughly 0.26 across), so the human-machine comparison's conclusion could change with a larger sample.
+
+## Additional Results
+
+{/*
+  [※ 진행 대기] Examples에서 들려준 6곡을 최종 모델에 직접 돌려 6-class 확률 분포를 보여주는 정성적 데모.
+  진행 전 확인 완료: 6곡 모두 학습 데이터에 없음(leakage 없음).
+  단, 이 6곡은 modern tier가 아닐 가능성이 높음 — 아래 문구로 명시하고 진행하기로 함.
+*/}
+
+What happens if we actually run the six tracks from Examples through the final model? None of these six were ever part of the training data.
+
+One caveat: these tracks (except Sellas) were produced in an earlier era than the modern tier the model was trained on. Even so, it's worth seeing whether the model's biome intuition transfers beyond the production style it learned from — and honestly, we were just curious how it'd do, so we put together this informal out-of-domain check.
+
+{/* [※ 파일명 확인 필요 — public/images/track_prediction_histograms.png로 가정] */}
+<img src="/images/track_prediction_histograms.png" alt="The model's predicted biome probability distribution for each of the six tracks" class="w-full rounded-lg" />
+
+The results were a coin flip. Ariant (desert), Mine (cave), and Sellas (ocean) were called correctly, with confidences of 0.71, 0.9, and 0.48 respectively. Ellinia (forest), Elnath (snow), and Partem (jungle) were missed. Elnath's correct answer (snow) came in a close second (forest 0.38 vs. snow 0.38) — less a clean miss than a narrow one.
+
+---
+
+## References
+
+[^ref]
