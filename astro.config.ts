@@ -13,6 +13,7 @@ import astroExpressiveCode from "astro-expressive-code";
 
 // https://astro.build/config
 export default defineConfig({
+  base: "/GameOST_to_Biome",
   vite: {
     plugins: [tailwindcss()],
   },
